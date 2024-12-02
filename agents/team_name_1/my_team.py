@@ -187,78 +187,31 @@ class ReflexCaptureAgent(CaptureAgent):
         a counter or a dictionary.
         """
         return {'successor_score': 1.0}
-    
-    def get_astar_action(self, game_state, goal):
-        """
-        Calcula la acción usando A* para moverse hacia el `goal`.
-        """
-        start = game_state.get_agent_position(self.index)
-        walls = game_state.get_walls()
-        path = a_star_search(game_state, start, goal, walls)
-        if path:
-            return path[0]  # Regresa la primera acción de la ruta
-        else:
-            return Directions.STOP
 
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
-    def choose_action(self, game_state):
-        """
-        Selecciona una acción usando A* cuando sea posible.
-        """
-        food_list = self.get_food(game_state).as_list()
-        capsules = self.get_capsules(game_state)
-
-        # Combina comida y cápsulas como posibles objetivos
-        targets = capsules + food_list
-
-        if targets:
-            my_pos = game_state.get_agent_position(self.index)
-            closest_target = min(targets, key=lambda x: self.get_maze_distance(my_pos, x))
-
-            # Usa A* para calcular la acción hacia el objetivo más cercano
-            action = self.get_astar_action(game_state, closest_target)
-            if action != Directions.STOP:
-                return action
-
-        # Si no hay comida ni cápsulas cerca, usa el comportamiento predeterminado
-        return super().choose_action(game_state)
-
-    def get_astar_action(self, game_state, goal):
-        """
-        Calcula la acción usando A* para moverse hacia el `goal`.
-        """
-        start = game_state.get_agent_position(self.index)
-        walls = game_state.get_walls()
-        path = a_star_search(game_state, start, goal, walls)
-        if path:
-            return path[0]  # Devuelve la primera acción del camino
-        else:
-            return Directions.STOP
-
     def get_features(self, game_state, action):
-        """
-        Modifica los features para el comportamiento ofensivo.
-        """
         features = util.Counter()
         successor = self.get_successor(game_state, action)
         food_list = self.get_food(successor).as_list()
 
-        features['successor_score'] = -len(food_list)  # Maximiza comida restante
+        # 1. Cambiar el cálculo de la puntuación sucesora a la cantidad de comida.
+        features['successor_score'] = -len(food_list)
 
+        # 2. Calcular la distancia a la comida más cercana
         if len(food_list) > 0:
             my_pos = successor.get_agent_state(self.index).get_position()
             min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
             features['distance_to_food'] = min_distance
-
+        
+        # 3. Agregar penalización si hay enemigos cerca de la comida.
         enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
         enemy_positions = [e.get_position() for e in enemies if e.get_position() is not None]
-
         danger_distance = 9999
         for enemy_pos in enemy_positions:
             danger_distance = min(danger_distance, self.get_maze_distance(my_pos, enemy_pos))
-
-        if danger_distance < 4:
+        
+        if danger_distance < 4:  # Si hay enemigos cercanos, evitar la comida cercana.
             features['food_in_danger'] = 1
         else:
             features['food_in_danger'] = 0
@@ -266,14 +219,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         return features
 
     def get_weights(self, game_state, action):
-        """
-        Define los pesos de los features.
-        """
-        return {
-            'successor_score': 100,
-            'distance_to_food': -1,
-            'food_in_danger': 20
-        }
+        return {'successor_score': 100, 'distance_to_food': -1, 'food_in_danger': 20}
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
