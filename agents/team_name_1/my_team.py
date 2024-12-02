@@ -122,6 +122,32 @@ class ReflexCaptureAgent(CaptureAgent):
                 neighbors.append(next_pos)
         return neighbors
 
+    def choose_action(self, game_state):
+        """
+        Escoge una acción entre las que maximizan Q(s,a).
+        """
+        actions = game_state.get_legal_actions(self.index)
+
+        values = [self.evaluate(game_state, a) for a in actions]
+        max_value = max(values)
+        best_actions = [a for a, v in zip(actions, values) if v == max_value]
+
+        food_left = len(self.get_food(game_state).as_list())
+
+        if food_left <= 2:
+            best_dist = 9999
+            best_action = None
+            for action in actions:
+                successor = self.get_successor(game_state, action)
+                pos2 = successor.get_agent_position(self.index)
+                dist = self.get_maze_distance(self.start, pos2)
+                if dist < best_dist:
+                    best_action = action
+                    best_dist = dist
+            return best_action
+
+        return random.choice(best_actions)
+
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
@@ -142,6 +168,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def get_weights(self, game_state, action):
         return {'successor_score': 100, 'distance_to_food': -1}
+
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
