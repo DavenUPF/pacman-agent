@@ -67,15 +67,11 @@ class ReflexCaptureAgent(CaptureAgent):
         CaptureAgent.register_initial_state(self, game_state)
 
     def a_star(self, game_state, start, goal):
-        """
-        Implementación del algoritmo A* para encontrar el camino más corto
-        entre el punto `start` y `goal`.
-        """
         open_set = []
-        heapq.heappush(open_set, (0, start))  # Cola de prioridad (f(n), posición)
-        came_from = {}  # Para reconstruir el camino
-        g_score = {start: 0}  # Coste desde el inicio a cada nodo
-        f_score = {start: self.heuristic(start, goal)}  # f(n) = g(n) + h(n)
+        heapq.heappush(open_set, (0, start))
+        came_from = {}
+        g_score = {start: 0}
+        f_score = {start: self.heuristic(start, goal)}
 
         while open_set:
             _, current = heapq.heappop(open_set)
@@ -84,25 +80,19 @@ class ReflexCaptureAgent(CaptureAgent):
                 return self.reconstruct_path(came_from, current)
 
             for neighbor in self.get_neighbors(game_state, current):
-                tentative_g_score = g_score[current] + 1  # Coste uniforme
+                tentative_g_score = g_score[current] + 1
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
                     f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
-        return []  # No hay camino
+        return []
 
     def heuristic(self, pos1, pos2):
-        """
-        Heurística: Usamos la distancia Manhattan como estimación.
-        """
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
     def reconstruct_path(self, came_from, current):
-        """
-        Reconstruye el camino desde el nodo inicial al objetivo.
-        """
         path = []
         while current in came_from:
             path.append(current)
@@ -111,42 +101,32 @@ class ReflexCaptureAgent(CaptureAgent):
         return path
 
     def get_neighbors(self, game_state, position):
-        """
-        Devuelve los vecinos accesibles desde una posición.
-        """
         x, y = position
         neighbors = []
-        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  # Movimientos posibles
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
             next_pos = (x + dx, y + dy)
             if not game_state.has_wall(next_pos[0], next_pos[1]):
                 neighbors.append(next_pos)
         return neighbors
 
     def choose_action(self, game_state):
-        """
-        Escoge una acción entre las que maximizan Q(s,a).
-        """
         actions = game_state.get_legal_actions(self.index)
 
-        values = [self.evaluate(game_state, a) for a in actions]
-        max_value = max(values)
-        best_actions = [a for a, v in zip(actions, values) if v == max_value]
+        # Usamos get_features para obtener las características de cada acción
+        values = [self.get_features(game_state, action) for action in actions]
 
-        food_left = len(self.get_food(game_state).as_list())
+        # Calculamos los pesos usando get_weights y seleccionamos la mejor acción
+        best_action = None
+        best_value = float('-inf')  # Valor inicial bajo para comparaciones
 
-        if food_left <= 2:
-            best_dist = 9999
-            best_action = None
-            for action in actions:
-                successor = self.get_successor(game_state, action)
-                pos2 = successor.get_agent_position(self.index)
-                dist = self.get_maze_distance(self.start, pos2)
-                if dist < best_dist:
-                    best_action = action
-                    best_dist = dist
-            return best_action
+        for action, value in zip(actions, values):
+            weight = self.get_weights(game_state, action)
+            score = sum([value[f] * weight.get(f, 0) for f in value])
+            if score > best_value:
+                best_value = score
+                best_action = action
 
-        return random.choice(best_actions)
+        return best_action
 
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
@@ -157,7 +137,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         features['successor_score'] = -len(food_list)
 
-        # Calcular distancia a la comida más cercana usando A*
         if len(food_list) > 0:
             my_pos = successor.get_agent_state(self.index).get_position()
             closest_food = min(food_list, key=lambda food: self.get_maze_distance(my_pos, food))
@@ -178,12 +157,10 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
         my_state = successor.get_agent_state(self.index)
         my_pos = my_state.get_position()
 
-        # Estar en defensa
         features['on_defense'] = 1
-        if my_state.is_pacman: 
+        if my_state.is_pacman:
             features['on_defense'] = 0
 
-        # Detectar invasores
         enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
         invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
         features['num_invaders'] = len(invaders)
@@ -194,11 +171,10 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
             path = self.a_star(successor, my_pos, invader_pos)
             features['invader_distance'] = len(path) if path else float('inf')
 
-        # Penalización por detenerse o moverse en reversa
-        if action == Directions.STOP: 
+        if action == Directions.STOP:
             features['stop'] = 1
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
-        if action == rev: 
+        if action == rev:
             features['reverse'] = 1
 
         return features
