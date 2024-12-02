@@ -123,7 +123,6 @@ class ReflexCaptureAgent(CaptureAgent):
         return neighbors
 
 
-
 class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
         features = util.Counter()
@@ -143,7 +142,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def get_weights(self, game_state, action):
         return {'successor_score': 100, 'distance_to_food': -1}
-
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
