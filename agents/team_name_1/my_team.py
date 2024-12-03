@@ -240,13 +240,14 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         """
         Obtiene la posición actual del agente.
         """
-        return self.get_game_state().get_agent_state(self.index).get_position()
+        # Aquí se utiliza game_state en lugar de get_game_state
+        return self.get_current_game_state().get_agent_state(self.index).get_position()
 
     def get_successor_position(self, action):
         """
         Obtiene la posición del sucesor después de realizar una acción.
         """
-        successor = self.get_game_state().generate_successor(self.index, action)
+        successor = self.get_current_game_state().generate_successor(self.index, action)
         return successor.get_agent_state(self.index).get_position()
 
     def get_enemies_in_range(self, game_state, range_distance=5):
