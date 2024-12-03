@@ -213,8 +213,9 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             # Verificar si el agente está en territorio enemigo y si debe evitar al enemigo
             if self.is_at_base(game_state):
                 # Si el agente está en territorio enemigo, evitar a los enemigos cercanos
+                # Si hay un enemigo cerca, no tomar esta acción
                 if any(self.get_maze_distance(successor.get_agent_state(self.index).get_position(), enemy.get_position()) < 5 for enemy in enemies_in_range):
-                    continue  # No tomar esta acción si un enemigo está cerca
+                    continue  # Evitar la acción si un enemigo está cerca
 
             # Si no se evitan enemigos, calcular el valor de la acción
             weights = self.get_weights(game_state, action)
@@ -223,8 +224,8 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                 best_value = score
                 best_action = action
 
+        # Si no se encontró una acción válida (evitando enemigos), hacer una elección aleatoria
         return best_action if best_action else random.choice(actions)
-
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
