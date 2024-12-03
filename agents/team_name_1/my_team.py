@@ -251,6 +251,15 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                 min_dist_to_base = dist_to_base
 
         return best_action
+    
+    def get_enemies_in_range(self, game_state, range_distance):
+        """
+        Obtiene los enemigos dentro de un rango de `range_distance` desde la posición del agente.
+        """
+        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
+        enemies_in_range = [enemy for enemy in enemies if enemy.get_position() is not None and self.get_maze_distance(game_state.get_agent_state(self.index).get_position(), enemy.get_position()) <= range_distance]
+        return enemies_in_range
+    
 
     def is_at_base(self, game_state):
         """
