@@ -25,6 +25,7 @@ import util
 
 from contest.capture_agents import CaptureAgent
 from contest.game import Directions
+from contest.game import Actions
 from util import nearest_point
 
 
@@ -65,7 +66,18 @@ class ReflexCaptureAgent(CaptureAgent):
         self.start = game_state.get_agent_position(self.index)
         CaptureAgent.register_initial_state(self, game_state)
 
+    def simulate_position(self, game_state, action):
+        """
+        Simula la nueva posición del agente tras aplicar una acción.
+        """
+        x, y = game_state.get_agent_position(self.index)
+        dx, dy = Actions.direction_to_vector(action)
+        return (int(x + dx), int(y + dy))
+
     def a_star(self, game_state, start, goal):
+        """
+        Implementación del algoritmo A* para encontrar la ruta más corta desde `start` hasta `goal`.
+        """
         open_set = []
         heapq.heappush(open_set, (0, start))
         came_from = {}
@@ -108,22 +120,6 @@ class ReflexCaptureAgent(CaptureAgent):
                 neighbors.append(next_pos)
         return neighbors
 
-    def choose_action(self, game_state):
-        actions = game_state.get_legal_actions(self.index)
-        values = [self.get_features(game_state, action) for action in actions]
-
-        best_action = None
-        best_value = float('-inf')
-
-        for action, value in zip(actions, values):
-            weight = self.get_weights(game_state, action)
-            score = sum([value[f] * weight.get(f, 0) for f in value])
-            if score > best_value:
-                best_value = score
-                best_action = action
-
-        return best_action
-
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
@@ -133,8 +129,10 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         new_pos = self.simulate_position(game_state, action)
         food_list = self.get_food(game_state).as_list()
 
+        # Comida restante
         features['successor_score'] = -len(food_list)
 
+        # Distancia a la comida más cercana
         if len(food_list) > 0:
             closest_food = min(food_list, key=lambda food: self.get_maze_distance(new_pos, food))
             path = self.a_star(game_state, new_pos, closest_food)
@@ -145,13 +143,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_weights(self, game_state, action):
         return {'successor_score': 100, 'distance_to_food': -1}
 
-    def simulate_position(self, game_state, action):
-        """
-        Simula la nueva posición del agente tras aplicar una acción.
-        """
-        x, y = game_state.get_agent_position(self.index)
-        dx, dy = Actions.direction_to_vector(action)
-        return (int(x + dx), int(y + dy))
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
@@ -161,11 +152,13 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
         # Simular nueva posición tras aplicar la acción
         new_pos = self.simulate_position(game_state, action)
 
+        # Evaluar si el agente está defendiendo
         my_state = game_state.get_agent_state(self.index)
         features['on_defense'] = 1
         if my_state.is_pacman:
             features['on_defense'] = 0
 
+        # Detectar invasores
         enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
         invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
         features['num_invaders'] = len(invaders)
@@ -176,6 +169,7 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
             path = self.a_star(game_state, new_pos, invader_pos)
             features['invader_distance'] = len(path) if path else float('inf')
 
+        # Penalización por detenerse o retroceder
         if action == Directions.STOP:
             features['stop'] = 1
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
@@ -187,7 +181,3 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
     def get_weights(self, game_state, action):
         return {'num_invaders': -1000, 'on_defense': 100, 'invader_distance': -10, 'stop': -100, 'reverse': -2}
 
-    def simulate_position(self, game_state, action):
-        x, y = game_state.get_agent_position(self.index)
-        dx, dy = Actions.direction_to_vector(action)
-        return (int(x + dx), int(y + dy))
