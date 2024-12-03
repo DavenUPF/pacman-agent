@@ -65,6 +65,27 @@ class ReflexCaptureAgent(CaptureAgent):
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
         CaptureAgent.register_initial_state(self, game_state)
+    
+    def choose_action(self, game_state):
+        """
+        Selecciona la mejor acción basada en las características y los pesos.
+        """
+        actions = game_state.get_legal_actions(self.index)
+
+        # Calcula las características y los pesos para cada acción
+        values = [self.get_features(game_state, action) for action in actions]
+        best_action = None
+        best_value = float('-inf')  # Inicializa con un valor bajo
+
+        for action, value in zip(actions, values):
+            weights = self.get_weights(game_state, action)
+            score = sum([value[f] * weights.get(f, 0) for f in value])
+            if score > best_value:
+                best_value = score
+                best_action = action
+
+        return best_action
+
 
     def simulate_position(self, game_state, action):
         """
