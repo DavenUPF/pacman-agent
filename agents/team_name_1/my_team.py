@@ -201,6 +201,11 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                 min_distance = dist
                 best_action = action
 
+        # Verifica si el agente recogió comida en esta acción
+        successor = self.get_successor(game_state, best_action)
+        if self.get_food(successor).as_list() != self.get_food(game_state).as_list():
+            self.food_collected += 1  # Incrementa el contador de comida cuando recoge comida
+
         return best_action
 
     def move_to_base(self, actions, game_state):
