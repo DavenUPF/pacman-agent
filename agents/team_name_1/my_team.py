@@ -136,7 +136,6 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         return {'successor_score': 1.0}
 
-
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
     A reflex agent that seeks food with clear decision-making logic.
@@ -195,26 +194,43 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def return_to_base(self, actions, game_state):
         """
-        Mueve al agente hacia la base y reinicia el contador de comida al llegar.
+        Mueve al agente hacia su mitad del mapa y reinicia el contador de comida al llegar.
         """
+        my_pos = game_state.get_agent_position(self.index)
+        boundary_x = self.get_boundary_x(game_state)  # Calcula el límite de nuestra mitad
+
         best_action = None
         min_distance = float('inf')
 
         for action in actions:
             successor = self.get_successor(game_state, action)
-            pos = successor.get_agent_state(self.index).get_position()
-            dist = self.get_maze_distance(pos, self.start)  # Distancia hacia la posición inicial
-            if dist < min_distance:
-                min_distance = dist
-                best_action = action
+            successor_pos = successor.get_agent_state(self.index).get_position()
 
-        # Reinicia el contador si llega a la base
+            # Verifica si está en nuestra mitad del mapa
+            if successor_pos[0] <= boundary_x:
+                dist = self.get_maze_distance(successor_pos, self.start)  # Aproximación hacia un punto seguro
+                if dist < min_distance:
+                    min_distance = dist
+                    best_action = action
+
+        # Reinicia el contador si está en nuestra mitad del mapa
         if best_action is not None:
             successor = self.get_successor(game_state, best_action)
-            if successor.get_agent_position(self.index) == self.start:
+            if successor.get_agent_state(self.index).get_position()[0] <= boundary_x:
                 self.food_collected = 0  # Reinicia el contador
 
-        return best_action
+        return best_action if best_action else random.choice(actions)
+
+    def get_boundary_x(self, game_state):
+        """
+        Determina el límite entre nuestra mitad y la del oponente.
+        """
+        layout_width = game_state.data.layout.width
+        if self.red:
+            return (layout_width // 2) - 1  # Para el equipo rojo
+        else:
+            return layout_width // 2  # Para el equipo azul
+
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     """
