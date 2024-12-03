@@ -139,7 +139,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that seeks food and avoids enemies. 
+    A reflex agent that seeks food and avoids enemies when visible.
     """
     def get_features(self, game_state, action):
         features = util.Counter()
@@ -157,16 +157,24 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         else:
             features['distance_to_food'] = 0  # Si no hay comida, la distancia es 0
 
-        # Detectar enemigos (Pacman enemigos)
+        # Detectar enemigos (Pacman enemigos) solo si están dentro del rango de visión
         enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
         invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
-        
-        # Calcular la distancia al enemigo más cercano
+
+        # Calcular la distancia al enemigo más cercano si el agente lo puede ver
         if invaders:
-            enemy_dists = [self.get_maze_distance(successor.get_agent_state(self.index).get_position(), a.get_position()) for a in invaders]
-            features['enemy_distance'] = min(enemy_dists)
+            my_pos = successor.get_agent_state(self.index).get_position()
+            visible_invaders = [a for a in invaders if self.get_maze_distance(my_pos, a.get_position()) <= 5]
+            
+            if visible_invaders:
+                # Si hay enemigos visibles dentro de un rango de 5 casillas, calcular la distancia más cercana
+                enemy_dists = [self.get_maze_distance(my_pos, a.get_position()) for a in visible_invaders]
+                features['enemy_distance'] = min(enemy_dists)
+            else:
+                # Si no hay enemigos visibles, asignar una distancia segura alta
+                features['enemy_distance'] = float('inf')  # No hay enemigos cercanos visibles
         else:
-            features['enemy_distance'] = float('inf')  # No hay enemigos, lo consideramos muy lejano
+            features['enemy_distance'] = float('inf')  # No hay enemigos
 
         return features
 
@@ -192,8 +200,8 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         food_left = len(self.get_food(game_state).as_list())
 
+        # Si queda poca comida, buscar la acción que nos acerque a la posición inicial
         if food_left <= 2:
-            # Si queda poca comida, buscar la acción que nos acerque a la posición inicial
             best_dist = 9999
             best_action = None
             for action in actions:
@@ -206,6 +214,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             return best_action
 
         return random.choice(best_actions)
+
 
 
 
