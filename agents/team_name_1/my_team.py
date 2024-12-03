@@ -97,13 +97,14 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def a_star(self, game_state, start, goal):
         """
-        Implementación del algoritmo A* para encontrar la ruta más corta desde `start` hasta `goal`.
+        Implementación mejorada de A* que utiliza self.get_maze_distance
+        para calcular distancias y evita cálculos en tiempo real.
         """
         open_set = []
         heapq.heappush(open_set, (0, start))
         came_from = {}
         g_score = {start: 0}
-        f_score = {start: self.heuristic(start, goal)}
+        f_score = {start: self.heuristic(game_state, start, goal)}
 
         while open_set:
             _, current = heapq.heappop(open_set)
@@ -116,21 +117,44 @@ class ReflexCaptureAgent(CaptureAgent):
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
+                    f_score[neighbor] = tentative_g_score + self.heuristic(game_state, neighbor, goal)
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
         return []
 
-    def heuristic(self, pos1, pos2):
-        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+    def heuristic(self, game_state, position, goal):
+        """
+        Heurística mejorada para A* que considera enemigos cercanos.
+        """
+        # Distancia Manhattan hacia el objetivo
+        h = abs(position[0] - goal[0]) + abs(position[1] - goal[1])
+
+        # Evitar enemigos cercanos
+        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
+        ghosts = [a for a in enemies if not a.is_pacman and a.get_position() is not None]
+
+        if ghosts:
+            # Encuentra el fantasma más cercano
+            ghost_distances = [self.get_maze_distance(position, ghost.get_position()) for ghost in ghosts]
+            closest_ghost_distance = min(ghost_distances)
+
+            # Penalización si el fantasma está demasiado cerca
+            if closest_ghost_distance < 3:  # Por ejemplo, 3 celdas de distancia
+                h += (3 - closest_ghost_distance) * 10  # Penalización más alta cuanto más cerca esté
+
+        return h
 
     def reconstruct_path(self, came_from, current):
+        """
+        Reconstruye el camino desde la meta al inicio.
+        """
         path = []
         while current in came_from:
             path.append(current)
             current = came_from[current]
         path.reverse()
         return path
+
 
     def get_neighbors(self, game_state, position):
         x, y = map(int, position)
