@@ -60,7 +60,6 @@ import heapq
 class ReflexCaptureAgent(CaptureAgent):
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
-        self.start = None
 
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
