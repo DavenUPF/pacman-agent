@@ -139,7 +139,7 @@ class ReflexCaptureAgent(CaptureAgent):
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
     A reflex agent that seeks food with clear decision-making logic
-    and evades nearby enemies.
+    and evades nearby enemies when in enemy territory.
     """
 
     def __init__(self, index, time_for_computing=.1):
@@ -150,7 +150,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         """
         Gestión de acciones basadas en estados:
         1. Si se recogieron 3 piezas de comida, regresa a la base.
-        2. Si detecta un enemigo cercano, se aleja.
+        2. Si detecta un enemigo cercano mientras está en la base enemiga, se aleja.
         3. Si no, busca comida.
         4. Si no hay comida o no hay una opción clara, actúa aleatoriamente.
         """
@@ -161,10 +161,11 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         actions = game_state.get_legal_actions(self.index)
 
-        # Si hay enemigos cercanos, intenta evadirlos
-        enemies = self.get_visible_enemies(game_state)
-        if len(enemies) > 0:
-            return self.evade_enemy(actions, game_state, enemies)
+        # Si está en territorio enemigo y hay enemigos cercanos, intenta evadirlos
+        if game_state.get_agent_state(self.index).is_pacman:
+            enemies = self.get_visible_enemies(game_state)
+            if len(enemies) > 0:
+                return self.evade_enemy(actions, game_state, enemies)
 
         # Si recogió 3 piezas de comida, regresa a la base
         if self.food_collected >= 3:
@@ -206,7 +207,8 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def evade_enemy(self, actions, game_state, enemies):
         """
-        Selecciona la acción que maximice la distancia con el enemigo más cercano.
+        Selecciona la acción que maximice la distancia con el enemigo más cercano,
+        pero solo si el agente está en la base enemiga (es Pacman).
         """
         my_pos = game_state.get_agent_position(self.index)
         enemy_positions = [enemy.get_position() for enemy in enemies if enemy.get_position() is not None]
