@@ -136,6 +136,7 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         return {'successor_score': 1.0}
 
+
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
     A reflex agent that seeks food, and returns to base after collecting 6 pieces of food.
@@ -178,10 +179,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         # Si no hay enemigos y comida está disponible, dirigirse a la comida más cercana
         best_action = self.choose_food(actions, game_state, food_list)
-
-        # Aumentar el contador de comida recogida si el agente ha comido una pieza de comida
-        if best_action and self.is_food_collected(game_state, best_action):
-            self.food_collected += 1
 
         return best_action
 
@@ -231,29 +228,25 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def move_to_base(self, actions, game_state):
         """
-        Mueve al agente hacia la base (mitad izquierda del mapa) después de recoger 6 piezas de comida.
+        Mueve al agente hacia la base después de recoger 6 piezas de comida.
         """
         # Si el agente ya está en la base, reinicia el contador de comida y sigue recogiendo
         if self.is_at_base(game_state):
             self.food_collected = 0  # Resetear la comida recogida
             return self.choose_food(actions, game_state, self.get_food(game_state).as_list())
 
-        # Si no está en la base, moverse hacia la mitad izquierda del mapa (hacia la base)
+        # Moverse hacia la base (simplemente hacia la mitad izquierda del mapa)
         best_action = None
-        min_dist_to_base = float('inf')
-
         for action in actions:
             successor = self.get_successor(game_state, action)
             successor_pos = successor.get_agent_state(self.index).get_position()
 
-            base_pos = (self.base_x_limit, successor_pos[1])  # Mantener la misma posición y solo modificar X
-            dist_to_base = self.get_maze_distance(successor_pos, base_pos)
+            # Comprobar si el agente se está moviendo hacia la base
+            if successor_pos[0] < self.base_x_limit:
+                return action
 
-            if dist_to_base < min_dist_to_base:
-                best_action = action
-                min_dist_to_base = dist_to_base
-
-        return best_action
+        # Si no encuentra ninguna acción directa hacia la base, elige aleatoriamente
+        return random.choice(actions)
     
     def get_enemies_in_range(self, game_state, range_distance):
         """
@@ -269,19 +262,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         """
         current_pos = game_state.get_agent_state(self.index).get_position()
         return current_pos[0] < self.base_x_limit  # El agente está en la mitad izquierda del mapa
-
-    def is_food_collected(self, game_state, action):
-        """
-        Verifica si el agente ha recogido comida después de ejecutar la acción.
-        """
-        # Obtener la nueva posición después de la acción
-        successor = self.get_successor(game_state, action)
-        successor_pos = successor.get_agent_state(self.index).get_position()
-
-        # Verificar si la nueva posición tiene comida
-        food_list = self.get_food(game_state).as_list()
-        return successor_pos in food_list
-
 
 
 
