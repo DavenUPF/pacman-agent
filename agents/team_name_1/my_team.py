@@ -165,12 +165,6 @@ class ReflexCaptureAgent(CaptureAgent):
                 neighbors.append(next_pos)
         return neighbors
 
-
-from captureAgents import CaptureAgent
-from game import Directions
-import util
-import random
-
 class OffensiveReflexAgent(CaptureAgent):
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
