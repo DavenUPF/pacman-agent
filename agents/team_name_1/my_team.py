@@ -100,27 +100,20 @@ class ReflexCaptureAgent(CaptureAgent):
         return path
 
     def get_neighbors(self, game_state, position):
-        """
-        Devuelve los vecinos accesibles desde una posición.
-        """
-        x, y = map(int, position)  # Convertir posición a enteros
+        x, y = map(int, position)
         neighbors = []
-        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  # Movimientos posibles
-            next_pos = (int(x + dx), int(y + dy))  # Asegurarse de que next_pos es una tupla de enteros
-            if not game_state.has_wall(next_pos[0], next_pos[1]):  # Comprobar si es válido
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            next_pos = (int(x + dx), int(y + dy))
+            if not game_state.has_wall(next_pos[0], next_pos[1]):
                 neighbors.append(next_pos)
         return neighbors
 
-
     def choose_action(self, game_state):
         actions = game_state.get_legal_actions(self.index)
-
-        # Usamos get_features para obtener las características de cada acción
         values = [self.get_features(game_state, action) for action in actions]
 
-        # Calculamos los pesos usando get_weights y seleccionamos la mejor acción
         best_action = None
-        best_value = float('-inf')  # Valor inicial bajo para comparaciones
+        best_value = float('-inf')
 
         for action, value in zip(actions, values):
             weight = self.get_weights(game_state, action)
@@ -135,15 +128,16 @@ class ReflexCaptureAgent(CaptureAgent):
 class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
         features = util.Counter()
-        successor = self.get_successor(game_state, action)  # Usa el método get_successor de CaptureAgent
-        food_list = self.get_food(successor).as_list()
+
+        # Simular nueva posición tras aplicar la acción
+        new_pos = self.simulate_position(game_state, action)
+        food_list = self.get_food(game_state).as_list()
 
         features['successor_score'] = -len(food_list)
 
         if len(food_list) > 0:
-            my_pos = successor.get_agent_state(self.index).get_position()
-            closest_food = min(food_list, key=lambda food: self.get_maze_distance(my_pos, food))
-            path = self.a_star(successor, my_pos, closest_food)
+            closest_food = min(food_list, key=lambda food: self.get_maze_distance(new_pos, food))
+            path = self.a_star(game_state, new_pos, closest_food)
             features['distance_to_food'] = len(path) if path else float('inf')
 
         return features
@@ -151,27 +145,35 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_weights(self, game_state, action):
         return {'successor_score': 100, 'distance_to_food': -1}
 
+    def simulate_position(self, game_state, action):
+        """
+        Simula la nueva posición del agente tras aplicar una acción.
+        """
+        x, y = game_state.get_agent_position(self.index)
+        dx, dy = Actions.direction_to_vector(action)
+        return (int(x + dx), int(y + dy))
+
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
         features = util.Counter()
-        successor = super().get_successor(game_state, action)  # Usa el método get_successor de CaptureAgent
 
-        my_state = successor.get_agent_state(self.index)
-        my_pos = my_state.get_position()
+        # Simular nueva posición tras aplicar la acción
+        new_pos = self.simulate_position(game_state, action)
 
+        my_state = game_state.get_agent_state(self.index)
         features['on_defense'] = 1
         if my_state.is_pacman:
             features['on_defense'] = 0
 
-        enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
+        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
         invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
         features['num_invaders'] = len(invaders)
 
         if len(invaders) > 0:
-            closest_invader = min(invaders, key=lambda a: self.get_maze_distance(my_pos, a.get_position()))
+            closest_invader = min(invaders, key=lambda a: self.get_maze_distance(new_pos, a.get_position()))
             invader_pos = closest_invader.get_position()
-            path = self.a_star(successor, my_pos, invader_pos)
+            path = self.a_star(game_state, new_pos, invader_pos)
             features['invader_distance'] = len(path) if path else float('inf')
 
         if action == Directions.STOP:
@@ -184,3 +186,8 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
 
     def get_weights(self, game_state, action):
         return {'num_invaders': -1000, 'on_defense': 100, 'invader_distance': -10, 'stop': -100, 'reverse': -2}
+
+    def simulate_position(self, game_state, action):
+        x, y = game_state.get_agent_position(self.index)
+        dx, dy = Actions.direction_to_vector(action)
+        return (int(x + dx), int(y + dy))
