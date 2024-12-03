@@ -161,7 +161,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         La base está definida como la mitad izquierda del mapa.
         """
         current_pos = game_state.get_agent_state(self.index).get_position()
-        return current_pos[0] <= self.base_x_limit  # El agente está en la mitad izquierda del mapa
+        return current_pos[0] < self.base_x_limit  # El agente está en la mitad izquierda del mapa
 
     def get_features(self, game_state, action):
         """
@@ -208,16 +208,19 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         for action in actions:
             successor = self.get_successor(game_state, action)
-            features = self.get_features(game_state, action)
+            food_list = self.get_food(successor).as_list()
 
-            # Verificar si el agente está en territorio enemigo y si debe evitar al enemigo
+            # Si el agente está en territorio enemigo, debe evitar a los enemigos cercanos
             if self.is_at_base(game_state):
-                # Si el agente está en territorio enemigo, evitar a los enemigos cercanos
-                # Si hay un enemigo cerca, no tomar esta acción
-                if any(self.get_maze_distance(successor.get_agent_state(self.index).get_position(), enemy.get_position()) < 5 for enemy in enemies_in_range):
-                    continue  # Evitar la acción si un enemigo está cerca
+                # Si hay enemigos cercanos, no elegir esa comida
+                for food in food_list:
+                    # Comprobar si la comida está cerca de los enemigos
+                    if any(self.get_maze_distance(food, enemy.get_position()) <= 5 for enemy in enemies_in_range):
+                        # Si la comida está cerca de un enemigo, omitirla
+                        continue
 
-            # Si no se evitan enemigos, calcular el valor de la acción
+            # Si no se evita la comida, calcular las características de la acción
+            features = self.get_features(game_state, action)
             weights = self.get_weights(game_state, action)
             score = features * weights
             if score > best_value:
