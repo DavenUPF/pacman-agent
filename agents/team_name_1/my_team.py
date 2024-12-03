@@ -166,27 +166,114 @@ class ReflexCaptureAgent(CaptureAgent):
         return neighbors
 
 
-class OffensiveReflexAgent(ReflexCaptureAgent):
+from captureAgents import CaptureAgent
+from game import Directions
+import util
+import random
+
+class OffensiveReflexAgent(CaptureAgent):
+    def __init__(self, index, time_for_computing=.1):
+        super().__init__(index, time_for_computing)
+        
+    def choose_action(self, game_state):
+        actions = game_state.get_legal_actions(self.index)
+        best_action = None
+        best_score = float('-inf')
+
+        for action in actions:
+            features = self.get_features(game_state, action)
+            weights = self.get_weights(game_state, action)
+
+            # Calcula el puntaje para la acción basada en las características y los pesos
+            score = sum(features[f] * weights.get(f, 0) for f in features)
+
+            if score > best_score:
+                best_score = score
+                best_action = action
+
+        # Si no se encuentra una mejor acción, elegir una al azar
+        if best_action is None:
+            best_action = random.choice(actions)
+
+        return best_action
+
     def get_features(self, game_state, action):
         features = util.Counter()
 
-        # Simular nueva posición tras aplicar la acción
-        new_pos = self.simulate_position(game_state, action)
-        food_list = self.get_food(game_state).as_list()
+        # Obtener el sucesor del estado después de tomar la acción
+        successor = game_state.generate_successor(self.index, action)
+        food_list = self.get_food(successor).as_list()
 
-        # Comida restante
+        # Característica 1: cantidad de comida restante
         features['successor_score'] = -len(food_list)
 
-        # Distancia a la comida más cercana
-        if len(food_list) > 0:
-            closest_food = min(food_list, key=lambda food: self.get_maze_distance(new_pos, food))
-            path = self.a_star(game_state, new_pos, closest_food)
+        # Característica 2: distancia a la comida más cercana
+        if food_list:
+            my_pos = successor.get_agent_state(self.index).get_position()
+            closest_food = min(food_list, key=lambda food: self.get_maze_distance(my_pos, food))
+            path = self.a_star(successor, my_pos, closest_food)
             features['distance_to_food'] = len(path) if path else float('inf')
+        else:
+            features['distance_to_food'] = 0  # No hay comida, se puede explorar
+
+        # Penalización por quedarse quieto
+        if action == Directions.STOP:
+            features['stop'] = 1
+
+        # Penalización por moverse en reversa
+        reverse = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
+        if action == reverse:
+            features['reverse'] = 1
 
         return features
 
     def get_weights(self, game_state, action):
-        return {'successor_score': 100, 'distance_to_food': -1}
+        # Asignar pesos a las características
+        return {
+            'successor_score': 100,  # Más comida es mejor
+            'distance_to_food': -1,  # Menor distancia a la comida es mejor
+            'stop': -100,  # No queremos detenernos
+            'reverse': -2  # Evitar dar marcha atrás
+        }
+
+    def a_star(self, game_state, start, goal):
+        # Algoritmo A* para encontrar el camino más corto (simplificado)
+        open_set = []
+        heapq.heappush(open_set, (0, start))
+        came_from = {}
+        g_score = {start: 0}
+        f_score = {start: self.heuristic(start, goal)}
+
+        while open_set:
+            _, current = heapq.heappop(open_set)
+
+            if current == goal:
+                return self.reconstruct_path(came_from, current)
+
+            for neighbor in self.get_neighbors(game_state, current):
+                tentative_g_score = g_score[current] + 1
+                if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
+
+        return []
+
+    def heuristic(self, pos1, pos2):
+        # Heurística basada en la distancia Manhattan
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+    def get_neighbors(self, game_state, position):
+        # Obtener los vecinos accesibles desde una posición (sin paredes)
+        x, y = position
+        neighbors = []
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            next_pos = (x + dx, y + dy)
+            if not game_state.has_wall(next_pos[0], next_pos[1]):
+                neighbors.append(next_pos)
+        return neighbors
+
 
 
 
