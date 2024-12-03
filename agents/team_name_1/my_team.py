@@ -152,6 +152,11 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         2. Si no, busca comida.
         3. Si no hay comida o no hay una opción clara, actúa aleatoriamente.
         """
+        # Reinicia el contador si el agente ha sido capturado (vuelve a la posición inicial)
+        current_position = game_state.get_agent_position(self.index)
+        if current_position == self.start:
+            self.food_collected = 0
+
         actions = game_state.get_legal_actions(self.index)
 
         # 1. Si recogió 3 piezas de comida, regresa a la base
@@ -234,6 +239,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             boundary_positions.append((boundary_x, y))
 
         return boundary_positions
+
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
