@@ -240,7 +240,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         """
         Obtiene la posición actual del agente.
         """
-        return self.get_agent_state(self.index).get_position()
+        return self.get_game_state().get_agent_state(self.index).get_position()
 
     def get_successor_position(self, action):
         """
