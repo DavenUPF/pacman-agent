@@ -23,8 +23,8 @@
 import random
 import util
 
-from capture_agents import CaptureAgent
-from game import Directions
+from contest.capture_agents import CaptureAgent
+from contest.game import Directions
 from util import nearest_point
 
 
