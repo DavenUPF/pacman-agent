@@ -138,7 +138,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that seeks food and knows when to return to its base.
+    A reflex agent that seeks food with clear decision-making logic.
     """
 
     def __init__(self, index, time_for_computing=.1):
@@ -150,6 +150,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         Gestión de acciones basadas en estados:
         1. Si se recogieron 3 piezas de comida, regresa a la base.
         2. Si no, busca comida.
+        3. Si no hay comida o no hay una opción clara, actúa aleatoriamente.
         """
         actions = game_state.get_legal_actions(self.index)
 
@@ -157,7 +158,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         if self.food_collected >= 3:
             return self.return_to_base(actions, game_state)
 
-        # 2. Busca comida
+        # 2. Busca la comida más cercana
         food_list = self.get_food(game_state).as_list()
         if len(food_list) > 0:
             return self.collect_food(actions, food_list, game_state)
@@ -193,39 +194,46 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def return_to_base(self, actions, game_state):
         """
-        Mueve al agente hacia su mitad del mapa y reinicia el contador de comida al llegar.
+        Mueve al agente hacia la mitad de su lado del mapa y reinicia el contador de comida.
         """
         my_pos = game_state.get_agent_position(self.index)
-        boundary_x = self.get_boundary_x(game_state)  # Calcula el límite de nuestra mitad
+        boundary_positions = self.get_boundary_positions(game_state)
+        nearest_boundary = min(boundary_positions, key=lambda pos: self.get_maze_distance(my_pos, pos))
+
         best_action = None
         min_distance = float('inf')
 
         for action in actions:
             successor = self.get_successor(game_state, action)
             successor_pos = successor.get_agent_state(self.index).get_position()
+            dist = self.get_maze_distance(successor_pos, nearest_boundary)
+            if dist < min_distance:
+                min_distance = dist
+                best_action = action
 
-            # Prioriza moverse hacia su mitad del mapa
-            if successor_pos[0] <= boundary_x:  # En nuestra mitad
-                dist = self.get_maze_distance(successor_pos, my_pos)  # Mueve hacia la mitad
-                if dist < min_distance:
-                    min_distance = dist
-                    best_action = action
+        # Reinicia el contador si llega a una posición en la frontera
+        if best_action is not None:
+            successor = self.get_successor(game_state, best_action)
+            if successor.get_agent_position(self.index) in boundary_positions:
+                self.food_collected = 0  # Reinicia el contador
 
-        # Reinicia el contador si ya está en nuestra mitad
-        if my_pos[0] <= boundary_x:
-            self.food_collected = 0
+        return best_action
 
-        return best_action if best_action else random.choice(actions)
-
-    def get_boundary_x(self, game_state):
+    def get_boundary_positions(self, game_state):
         """
-        Determina el límite entre nuestra mitad y la del oponente.
+        Retorna las posiciones accesibles en la frontera entre ambas mitades del mapa.
         """
         layout_width = game_state.data.layout.width
-        if self.red:
-            return (layout_width // 2) - 1  # Para el equipo rojo
-        else:
-            return layout_width // 2  # Para el equipo azul
+        layout_height = game_state.data.layout.height
+        boundary_x = (layout_width // 2) - 1 if self.red else layout_width // 2
+
+        boundary_positions = []
+        for y in range(layout_height):
+            if game_state.has_wall(boundary_x, y):
+                continue
+            boundary_positions.append((boundary_x, y))
+
+        return boundary_positions
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
