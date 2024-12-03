@@ -244,11 +244,13 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that keeps its side Pacman-free. Again,
-    this is to give you an idea of what a defensive agent
-    could be like.  It is not the best or only way to make
-    such an agent.
+    A reflex agent that keeps its side Pacman-free. It now uses noisy distance
+    readings to better estimate opponent locations.
     """
+
+    def __init__(self, index, time_for_computing=.1):
+        super().__init__(index, time_for_computing)
+        self.last_known_positions = {}  # Record of opponents' last known positions
 
     def get_features(self, game_state, action):
         features = util.Counter()
@@ -259,21 +261,73 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
 
         # Computes whether we're on defense (1) or offense (0)
         features['on_defense'] = 1
-        if my_state.is_pacman: features['on_defense'] = 0
+        if my_state.is_pacman:
+            features['on_defense'] = 0
 
-        # Computes distance to invaders we can see
+        # Compute distances to invaders we can see
         enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
-        invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
-        features['num_invaders'] = len(invaders)
-        if len(invaders) > 0:
-            dists = [self.get_maze_distance(my_pos, a.get_position()) for a in invaders]
-            features['invader_distance'] = min(dists)
+        visible_invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
+        features['num_invaders'] = len(visible_invaders)
 
-        if action == Directions.STOP: features['stop'] = 1
+        # Track visible invaders
+        if len(visible_invaders) > 0:
+            invader_distances = [self.get_maze_distance(my_pos, a.get_position()) for a in visible_invaders]
+            features['invader_distance'] = min(invader_distances)
+
+        # Handle noisy distances for unobserved opponents
+        noisy_distances = game_state.get_agent_distances()
+        possible_positions = self.get_possible_positions(game_state, noisy_distances)
+
+        # Prioritize moving towards the most likely opponent positions
+        if possible_positions:
+            closest_possible_dist = min(self.get_maze_distance(my_pos, pos) for pos in possible_positions)
+            features['likely_opponent_distance'] = closest_possible_dist
+        else:
+            features['likely_opponent_distance'] = 0  # No information available
+
+        # Penalize stopping and reversing
+        if action == Directions.STOP:
+            features['stop'] = 1
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
-        if action == rev: features['reverse'] = 1
+        if action == rev:
+            features['reverse'] = 1
 
         return features
 
     def get_weights(self, game_state, action):
-        return {'num_invaders': -1000, 'on_defense': 100, 'invader_distance': -10, 'stop': -100, 'reverse': -2}
+        """
+        Adjusts weights to balance defensive priorities.
+        """
+        return {
+            'num_invaders': -1000,
+            'on_defense': 100,
+            'invader_distance': -10,
+            'likely_opponent_distance': -5,
+            'stop': -100,
+            'reverse': -2
+        }
+
+    def get_possible_positions(self, game_state, noisy_distances):
+        """
+        Estimates possible positions for opponents based on noisy distances.
+        """
+        possible_positions = []
+        walls = game_state.get_walls()
+        width, height = walls.width, walls.height
+
+        # Iterate over each opponent
+        for opponent_index in self.get_opponents(game_state):
+            noisy_distance = noisy_distances[opponent_index]
+            opponent_positions = []
+
+            # Check all positions on the board
+            for x in range(width):
+                for y in range(height):
+                    if not walls[x][y]:
+                        manhattan_distance = abs(x - game_state.get_agent_position(self.index)[0]) + abs(y - game_state.get_agent_position(self.index)[1])
+                        if manhattan_distance == noisy_distance:
+                            opponent_positions.append((x, y))
+
+            possible_positions.extend(opponent_positions)
+
+        return possible_positions
