@@ -139,104 +139,86 @@ class ReflexCaptureAgent(CaptureAgent):
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that seeks food and avoids enemies when visible within 5 blocks, only when in enemy territory.
+    Un agente reflexivo que busca comida y evita a los enemigos cuando está en territorio enemigo.
     """
-    
-    def get_features(self, game_state, action):
-        features = util.Counter()
 
-        # Obtener el sucesor después de la acción
+    def register_initial_state(self, game_state):
+        """
+        Inicializa el agente con las coordenadas de la base y el tamaño del mapa.
+        """
+        self.map_width = len(game_state.getWalls()[0])  # Obtener el ancho del mapa
+        self.base_x_limit = self.map_width // 2  # Definir el límite de la base (mitad izquierda del mapa)
+        super().register_initial_state(game_state)
+
+    def is_at_base(self, game_state):
+        """
+        Verifica si el agente está en su base (territorio).
+        La base está definida como la mitad izquierda del mapa.
+        """
+        current_pos = game_state.get_agent_state(self.index).get_position()
+        return current_pos[0] < self.base_x_limit  # El agente está en la mitad izquierda del mapa
+
+    def get_features(self, game_state, action):
+        """
+        Calcula las características para la acción seleccionada.
+        """
+        features = util.Counter()
         successor = self.get_successor(game_state, action)
         food_list = self.get_food(successor).as_list()
-        features['successor_score'] = -len(food_list)  # El objetivo es comer comida
+        features['successor_score'] = -len(food_list)  # Penalizar por la comida restante
 
         # Calcular la distancia a la comida más cercana
-        if len(food_list) > 0:
+        if len(food_list) > 0:  # Esto siempre debería ser verdadero, pero por seguridad
             my_pos = successor.get_agent_state(self.index).get_position()
             min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
             features['distance_to_food'] = min_distance
-        else:
-            features['distance_to_food'] = 0  # Si no hay comida, la distancia es 0
-
-        # Detectar enemigos (Pacman enemigos) solo si están dentro del rango de visión
-        enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
-        invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
-
-        # Calcular la distancia al enemigo más cercano si el agente lo puede ver
-        enemy_distance = float('inf')  # Inicializamos con una distancia infinita
-        if invaders:
-            my_pos = successor.get_agent_state(self.index).get_position()
-            visible_invaders = [a for a in invaders if self.get_maze_distance(my_pos, a.get_position()) <= 5]
-            
-            if visible_invaders:
-                # Si hay enemigos visibles dentro de un rango de 5 casillas, calcular la distancia más cercana
-                enemy_dists = [self.get_maze_distance(my_pos, a.get_position()) for a in visible_invaders]
-                enemy_distance = min(enemy_dists)
-
-        features['enemy_distance'] = enemy_distance
+        
         return features
 
     def get_weights(self, game_state, action):
         """
-        Asigna pesos a las características del agente ofensivo.
+        Define los pesos de las características para la acción.
         """
-        return {
-            'successor_score': 100,  # Comer comida es importante
-            'distance_to_food': -1,  # Menor distancia a la comida es mejor
-            'enemy_distance': 10,    # Evitar enemigos cercanos
-        }
+        return {'successor_score': 100, 'distance_to_food': -1}
+
+    def get_enemies_in_range(self, game_state, range_distance):
+        """
+        Obtiene los enemigos dentro de un rango de `range_distance` desde la posición del agente.
+        """
+        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
+        enemies_in_range = [enemy for enemy in enemies if enemy.get_position() is not None and self.get_maze_distance(game_state.get_agent_state(self.index).get_position(), enemy.get_position()) <= range_distance]
+        return enemies_in_range
 
     def choose_action(self, game_state):
         """
-        Escoge la mejor acción considerando la comida y los enemigos cercanos.
+        Elige la mejor acción, considerando la comida y evitando enemigos cuando el agente está en territorio enemigo.
         """
         actions = game_state.get_legal_actions(self.index)
-        values = [self.evaluate(game_state, a) for a in actions]
 
-        max_value = max(values)
-        best_actions = [a for a, v in zip(actions, values) if v == max_value]
+        # Obtener los enemigos dentro de un rango de 5 bloques
+        enemies_in_range = self.get_enemies_in_range(game_state, 5)
 
-        # Detectar si un enemigo está demasiado cerca y estamos en territorio enemigo
-        food_left = len(self.get_food(game_state).as_list())
+        best_action = None
+        best_value = float('-inf')
 
-        # Determinar si estamos en el territorio enemigo
-        my_pos = game_state.get_agent_state(self.index).get_position()
+        for action in actions:
+            successor = self.get_successor(game_state, action)
+            features = self.get_features(game_state, action)
 
-        # Obtener las paredes del juego (asumiendo que ahora `walls` está correctamente definido)
-        walls = game_state.getWalls()  # O usa game_state.walls si ese es el nombre correcto
-        map_width = len(walls[0])  # Ancho del mapa
-        mid_line = map_width // 2
+            # Verificar si el agente está en territorio enemigo y si debe evitar al enemigo
+            if self.is_at_base(game_state):
+                # Si el agente está en territorio enemigo, evitar a los enemigos cercanos
+                if any(self.get_maze_distance(successor.get_agent_state(self.index).get_position(), enemy.get_position()) < 5 for enemy in enemies_in_range):
+                    continue  # No tomar esta acción si un enemigo está cerca
 
-        # Si el agente está en el territorio enemigo (columna > mitad del mapa), empieza a evitar enemigos
-        in_enemy_territory = my_pos[0] > mid_line
+            # Si no se evitan enemigos, calcular el valor de la acción
+            weights = self.get_weights(game_state, action)
+            score = features * weights
+            if score > best_value:
+                best_value = score
+                best_action = action
 
-        # Si queda poca comida, buscar la acción que nos acerque a la posición inicial
-        if food_left <= 2:
-            best_dist = 9999
-            best_action = None
-            for action in actions:
-                successor = self.get_successor(game_state, action)
-                pos2 = successor.get_agent_position(self.index)
-                dist = self.get_maze_distance(self.start, pos2)
-                if dist < best_dist:
-                    best_action = action
-                    best_dist = dist
-            return best_action
-
-        # Si estamos en territorio enemigo y hay un enemigo cercano (menos de 5 bloques de distancia), evitamos
-        best_action = random.choice(best_actions)
-        successor = self.get_successor(game_state, best_action)
-
-        if in_enemy_territory and successor.get_feature('enemy_distance') < 5:
-            # El agente debe cambiar de dirección si el enemigo está cerca
-            # Buscar una acción alternativa para evitar el enemigo
-            for action in actions:
-                successor = self.get_successor(game_state, action)
-                if successor.get_feature('enemy_distance') >= 5:
-                    best_action = action
-                    break
-
-        return best_action
+        return best_action if best_action else random.choice(actions)
 
 
 
