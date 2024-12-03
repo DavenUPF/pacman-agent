@@ -155,7 +155,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 class DefensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
         features = util.Counter()
-        successor = self.get_successor(game_state, action)  # Usa el método get_successor de CaptureAgent
+        successor = super().get_successor(game_state, action)  # Usa el método get_successor de CaptureAgent
 
         my_state = successor.get_agent_state(self.index)
         my_pos = my_state.get_position()
