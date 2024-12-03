@@ -139,95 +139,82 @@ class ReflexCaptureAgent(CaptureAgent):
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that seeks food. This is an agent
-    we give you to get an idea of what an offensive agent might look like,
-    but it is by no means the best or only way to build an offensive agent.
+    A reflex agent that seeks food with clear decision-making logic.
     """
 
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
         self.food_collected = 0  # Contador de comida recogida
 
-    def get_features(self, game_state, action):
-        features = util.Counter()
-        successor = self.get_successor(game_state, action)
-        food_list = self.get_food(successor).as_list()
-        features['successor_score'] = -len(food_list)  # self.get_score(successor)
-
-        # Compute distance to the nearest food
-        if len(food_list) > 0:  # This should always be True, but better safe than sorry
-            my_pos = successor.get_agent_state(self.index).get_position()
-            min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
-            features['distance_to_food'] = min_distance
-
-        return features
-
-    def get_weights(self, game_state, action):
-        return {'successor_score': 100, 'distance_to_food': -1}
-
     def choose_action(self, game_state):
         """
-        Elige la mejor acción considerando el progreso del agente en recoger comida y la necesidad de regresar a la base.
+        Gestión de acciones basadas en estados:
+        1. Si se recogieron 3 piezas de comida, regresa a la base.
+        2. Si no, busca comida.
+        3. Si no hay comida o no hay una opción clara, actúa aleatoriamente.
         """
         actions = game_state.get_legal_actions(self.index)
 
-        # Si el agente ha recogido 3 piezas de comida, regresa a la base
+        # 1. Si recogió 3 piezas de comida, regresa a la base
         if self.food_collected >= 3:
-            return self.move_to_base(actions, game_state)
+            return self.return_to_base(actions, game_state)
 
-        # Obtener la comida más cercana
+        # 2. Busca la comida más cercana
         food_list = self.get_food(game_state).as_list()
-        if len(food_list) == 0:
-            return random.choice(actions)
+        if len(food_list) > 0:
+            return self.collect_food(actions, food_list, game_state)
 
+        # 3. Actúa aleatoriamente si no hay comida
+        return random.choice(actions)
+
+    def collect_food(self, actions, food_list, game_state):
+        """
+        Mueve al agente hacia la comida más cercana y actualiza el contador de comida.
+        """
         my_pos = game_state.get_agent_position(self.index)
         nearest_food = min(food_list, key=lambda food: self.get_maze_distance(my_pos, food))
 
-        # Moverse hacia la comida más cercana
-        return self.move_towards_food(actions, nearest_food, game_state)
+        best_action = None
+        min_distance = float('inf')
 
-    def move_towards_food(self, actions, food_pos, game_state):
+        for action in actions:
+            successor = self.get_successor(game_state, action)
+            successor_pos = successor.get_agent_state(self.index).get_position()
+            dist = self.get_maze_distance(successor_pos, nearest_food)
+            if dist < min_distance:
+                min_distance = dist
+                best_action = action
+
+        # Verifica si esta acción recoge comida
+        if best_action is not None:
+            successor = self.get_successor(game_state, best_action)
+            if self.get_food(successor).as_list() != self.get_food(game_state).as_list():
+                self.food_collected += 1  # Incrementa la comida recogida
+
+        return best_action
+
+    def return_to_base(self, actions, game_state):
         """
-        Mueve al agente hacia la comida más cercana.
+        Mueve al agente hacia la base y reinicia el contador de comida al llegar.
         """
         best_action = None
         min_distance = float('inf')
 
         for action in actions:
-            successor = self.get_successor(game_state, action)  # Obtener el siguiente estado del juego
-            successor_pos = successor.get_agent_state(self.index).get_position()  # Posición después de la acción
-            dist = self.get_maze_distance(successor_pos, food_pos)
+            successor = self.get_successor(game_state, action)
+            pos = successor.get_agent_state(self.index).get_position()
+            dist = self.get_maze_distance(pos, self.start)  # Distancia hacia la posición inicial
             if dist < min_distance:
                 min_distance = dist
                 best_action = action
 
-        # Verifica si el agente recogió comida en esta acción
-        successor = self.get_successor(game_state, best_action)
-        if self.get_food(successor).as_list() != self.get_food(game_state).as_list():
-            self.food_collected += 1  # Incrementa el contador de comida cuando recoge comida
+        # Reinicia el contador si llega a la base
+        if best_action is not None:
+            successor = self.get_successor(game_state, best_action)
+            if successor.get_agent_position(self.index) == self.start:
+                self.food_collected = 0  # Reinicia el contador
 
         return best_action
-
-    def move_to_base(self, actions, game_state):
-        """
-        Mueve al agente hacia la base después de recoger 3 piezas de comida.
-        """
-        best_action = None
-        for action in actions:
-            successor = self.get_successor(game_state, action)
-            pos = successor.get_agent_state(self.index).get_position()
-
-            # Si el agente se mueve hacia la base (determinada por la posición en el eje X)
-            if pos[0] < self.start[0]:
-                best_action = action
-                break
-
-        if best_action:
-            self.food_collected = 0  # Reinicia el contador de comida cuando llega a la base
-            return best_action
-
-        return random.choice(actions)  # Si no encuentra ninguna acción directa hacia la base, elige aleatoriamente
-
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     """
