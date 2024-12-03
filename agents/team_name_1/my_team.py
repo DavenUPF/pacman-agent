@@ -201,7 +201,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         # Determinar si estamos en el territorio enemigo
         my_pos = game_state.get_agent_state(self.index).get_position()
-        map_width = game_state.getWalls().width
+        map_width = len(game_state.getWalls()[0])  # Obtener el ancho del mapa a partir de las paredes
         mid_line = map_width // 2
 
         # Si el agente está en el territorio enemigo (columna > mitad del mapa), empieza a evitar enemigos
@@ -234,6 +234,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                     break
 
         return best_action
+
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
