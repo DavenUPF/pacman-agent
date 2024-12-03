@@ -219,7 +219,12 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                 for action in actions:
                     successor = self.get_successor(game_state, action)
                     my_pos = successor.get_agent_state(self.index).get_position()
-                    dist_to_base = self.get_maze_distance(my_pos, (self.base_x_limit, my_pos[1]))  # Usamos la posición de la base
+
+                    # Asegúrate de redondear las coordenadas a enteros
+                    my_pos_int = (int(round(my_pos[0])), int(round(my_pos[1])))
+                    base_pos = (self.base_x_limit, my_pos_int[1])  # Mantén la misma altura pero cambia la posición X
+                    dist_to_base = self.get_maze_distance(my_pos_int, base_pos)  # Calcula la distancia usando coordenadas enteras
+
                     if dist_to_base < min_dist_to_base:
                         best_action = action
                         min_dist_to_base = dist_to_base
@@ -237,8 +242,11 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                 successor = self.get_successor(game_state, action)
                 my_pos = successor.get_agent_state(self.index).get_position()
 
+                # Asegúrate de redondear las coordenadas a enteros
+                my_pos_int = (int(round(my_pos[0])), int(round(my_pos[1])))
+
                 # Evaluar la distancia mínima a los enemigos
-                min_dist_to_enemy = min([self.get_maze_distance(my_pos, enemy.get_position()) for enemy in enemies_in_range])
+                min_dist_to_enemy = min([self.get_maze_distance(my_pos_int, enemy.get_position()) for enemy in enemies_in_range])
                 
                 if min_dist_to_enemy > max_dist_to_enemy:
                     best_action = action
@@ -265,6 +273,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             self.food_collected += 1
 
         return best_action
+
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
