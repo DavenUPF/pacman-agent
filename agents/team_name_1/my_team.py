@@ -57,6 +57,8 @@ def create_team(first_index, second_index, is_red,
 ##########
 
 import heapq
+
+
 class ReflexCaptureAgent(CaptureAgent):
     """
     A base class for reflex agents that choose score-maximizing actions
@@ -65,6 +67,7 @@ class ReflexCaptureAgent(CaptureAgent):
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
         self.start = None
+        self.food_collected = 0  # Nuevo contador de comida recogida
 
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
@@ -76,11 +79,11 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         actions = game_state.get_legal_actions(self.index)
 
-        # You can profile your evaluation time by uncommenting these lines
-        # start = time.time()
-        values = [self.evaluate(game_state, a) for a in actions]
-        # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
+        # Si el agente ha recogido 3 piezas de comida, regresa a la base
+        if self.food_collected >= 3:
+            return self.move_to_base(actions, game_state)
 
+        values = [self.evaluate(game_state, a) for a in actions]
         max_value = max(values)
         best_actions = [a for a, v in zip(actions, values) if v == max_value]
 
@@ -99,6 +102,21 @@ class ReflexCaptureAgent(CaptureAgent):
             return best_action
 
         return random.choice(best_actions)
+
+    def move_to_base(self, actions, game_state):
+        """
+        Mueve al agente hacia la base después de recoger 3 piezas de comida.
+        """
+        for action in actions:
+            successor = self.get_successor(game_state, action)
+            pos = successor.get_agent_state(self.index).get_position()
+            
+            # Si el agente se mueve hacia la base (mitad izquierda del mapa)
+            if pos[0] < self.start[0]:
+                self.food_collected = 0  # Reinicia el contador de comida cuando llega a la base
+                return action
+        
+        return random.choice(actions)  # Si no encuentra ninguna acción directa hacia la base, elige aleatoriamente
 
     def get_successor(self, game_state, action):
         """
@@ -139,126 +157,68 @@ class ReflexCaptureAgent(CaptureAgent):
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that seeks food and returns to base after collecting 6 pieces of food.
+    A reflex agent that seeks food. This is an agent
+    we give you to get an idea of what an offensive agent might look like,
+    but it is by no means the best or only way to build an offensive agent.
     """
 
-    def __init__(self, index, time_for_computing=.1):
-        super().__init__(index, time_for_computing)
-        self.food_collected = 0  # Contador de comida recogida
-        self.base_x_limit = 0  # Límite para la base (mitad izquierda del mapa)
-    
-    def register_initial_state(self, game_state):
-        # Determinar el límite de la base (mitad izquierda del mapa)
-        self.base_x_limit = game_state.data.layout.width // 2
-        super().register_initial_state(game_state)
+    def get_features(self, game_state, action):
+        features = util.Counter()
+        successor = self.get_successor(game_state, action)
+        food_list = self.get_food(successor).as_list()
+        features['successor_score'] = -len(food_list)  # self.get_score(successor)
+
+        # Compute distance to the nearest food
+        if len(food_list) > 0:  # This should always be True, but better safe than sorry
+            my_pos = successor.get_agent_state(self.index).get_position()
+            min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
+            features['distance_to_food'] = min_distance
+        return features
+
+    def get_weights(self, game_state, action):
+        return {'successor_score': 100, 'distance_to_food': -1}
 
     def choose_action(self, game_state):
         """
-        Elige la mejor acción considerando comida, evasión de enemigos y la necesidad de regresar a la base.
+        Elige la mejor acción considerando comida y la necesidad de regresar a la base después de 3 piezas de comida.
         """
         actions = game_state.get_legal_actions(self.index)
 
-        # Si el agente ha recogido 6 piezas de comida, se dirige a la base
+        # Si el agente ha recogido 3 piezas de comida, se dirige a la base
         if self.food_collected >= 3:
             return self.move_to_base(actions, game_state)
 
-        # Obtener las posiciones de comida disponibles
+        values = [self.evaluate(game_state, a) for a in actions]
+        max_value = max(values)
+        best_actions = [a for a, v in zip(actions, values) if v == max_value]
+
         food_list = self.get_food(game_state).as_list()
+        if len(food_list) == 0:
+            return random.choice(best_actions)
 
-        # Si no hay comida, elige aleatoriamente
-        if not food_list:
-            return random.choice(actions)
+        # Si el agente se encuentra con comida, incrementa el contador de comida
+        my_pos = game_state.get_agent_position(self.index)
+        nearest_food = min(food_list, key=lambda food: self.get_maze_distance(my_pos, food))
+        if self.get_maze_distance(my_pos, nearest_food) <= 1:
+            self.food_collected += 1
 
-        # Si el agente se encuentra con un enemigo cerca, alejarse
-        enemies_in_range = self.get_enemies_in_range(game_state)
-
-        # Si hay enemigos cerca, alejarse de ellos
-        if enemies_in_range:
-            return self.avoid_enemy(actions, game_state)
-
-        # Si no hay enemigos y comida está disponible, dirigirse a la comida más cercana
-        return self.choose_food(actions, food_list, game_state)
-
-    def choose_food(self, actions, food_list, game_state):
-        """
-        Elige la acción que lleve al agente hacia la comida más cercana.
-        """
-        best_action = None
-        min_distance = float('inf')
-        my_pos = self.get_position(game_state)
-
-        for action in actions:
-            successor_pos = self.get_successor_position(action, game_state)
-
-            for food in food_list:
-                dist = self.get_maze_distance(successor_pos, food)
-                if dist < min_distance:
-                    min_distance = dist
-                    best_action = action
-                    # Incrementar el contador de comida recogida si el agente llega a la comida
-                    if successor_pos == food:
-                        self.food_collected += 1
-
-        return best_action
-
-    def avoid_enemy(self, actions, game_state):
-        """
-        Elige la mejor acción para alejarse de los enemigos cercanos.
-        """
-        best_action = None
-        max_dist_to_enemy = float('-inf')
-        my_pos = self.get_position(game_state)
-
-        # Evaluar la distancia mínima a los enemigos
-        for action in actions:
-            successor_pos = self.get_successor_position(action, game_state)
-
-            enemies = self.get_enemies_in_range(game_state)
-            min_dist_to_enemy = min([self.get_maze_distance(successor_pos, enemy.get_position()) for enemy in enemies])
-
-            if min_dist_to_enemy > max_dist_to_enemy:
-                best_action = action
-                max_dist_to_enemy = min_dist_to_enemy
-
-        return best_action
+        return random.choice(best_actions)
 
     def move_to_base(self, actions, game_state):
         """
-        Mueve al agente hacia la base después de recoger 6 piezas de comida.
+        Mueve al agente hacia la base después de recoger 3 piezas de comida.
         """
         for action in actions:
-            successor_pos = self.get_successor_position(action, game_state)
+            successor = self.get_successor(game_state, action)
+            pos = successor.get_agent_state(self.index).get_position()
             
-            # Si el agente se mueve a la izquierda (hacia la base), realiza la acción
-            if successor_pos[0] < self.base_x_limit:
+            # Si el agente se mueve hacia la base (mitad izquierda del mapa)
+            if pos[0] < self.start[0]:
+                self.food_collected = 0  # Reinicia el contador de comida cuando llega a la base
                 return action
+        
+        return random.choice(actions)  # Si no encuentra ninguna acción directa hacia la base, elige aleatoriamente
 
-        # Si no encuentra ninguna acción directa hacia la base, elige aleatoriamente
-        return random.choice(actions)
-    
-    def get_position(self, game_state):
-        """
-        Obtiene la posición actual del agente.
-        """
-        return game_state.get_agent_state(self.index).get_position()
-
-    def get_successor_position(self, action, game_state):
-        """
-        Obtiene la posición del sucesor después de realizar una acción.
-        """
-        successor = self.get_successor(game_state, action)
-        return successor.get_agent_state(self.index).get_position()
-
-    def get_enemies_in_range(self, game_state, range_distance=5):
-        """
-        Obtiene los enemigos dentro de un rango de `range_distance` desde la posición del agente.
-        """
-        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
-        enemies_in_range = [
-            enemy for enemy in enemies if enemy.get_position() is not None and 
-            self.get_maze_distance(self.get_position(game_state), enemy.get_position()) <= range_distance
-        ]
-        return enemies_in_range
 
 
 
