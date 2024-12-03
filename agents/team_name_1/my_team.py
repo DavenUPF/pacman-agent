@@ -159,7 +159,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         actions = game_state.get_legal_actions(self.index)
 
         # Si el agente ha recogido 6 piezas de comida, se dirige a la base
-        if self.food_collected >= 6:
+        if self.food_collected >= 3:
             return self.move_to_base(actions, game_state)
 
         # Obtener las posiciones de comida disponibles
