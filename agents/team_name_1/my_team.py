@@ -138,7 +138,8 @@ class ReflexCaptureAgent(CaptureAgent):
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
-    A reflex agent that seeks food with clear decision-making logic.
+    A reflex agent that seeks food with clear decision-making logic
+    and evades nearby enemies.
     """
 
     def __init__(self, index, time_for_computing=.1):
@@ -149,8 +150,9 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         """
         Gestión de acciones basadas en estados:
         1. Si se recogieron 3 piezas de comida, regresa a la base.
-        2. Si no, busca comida.
-        3. Si no hay comida o no hay una opción clara, actúa aleatoriamente.
+        2. Si detecta un enemigo cercano, se aleja.
+        3. Si no, busca comida.
+        4. Si no hay comida o no hay una opción clara, actúa aleatoriamente.
         """
         # Reinicia el contador si el agente ha sido capturado (vuelve a la posición inicial)
         current_position = game_state.get_agent_position(self.index)
@@ -159,16 +161,21 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         actions = game_state.get_legal_actions(self.index)
 
-        # 1. Si recogió 3 piezas de comida, regresa a la base
+        # Si hay enemigos cercanos, intenta evadirlos
+        enemies = self.get_visible_enemies(game_state)
+        if len(enemies) > 0:
+            return self.evade_enemy(actions, game_state, enemies)
+
+        # Si recogió 3 piezas de comida, regresa a la base
         if self.food_collected >= 3:
             return self.return_to_base(actions, game_state)
 
-        # 2. Busca la comida más cercana
+        # Busca comida
         food_list = self.get_food(game_state).as_list()
         if len(food_list) > 0:
             return self.collect_food(actions, food_list, game_state)
 
-        # 3. Actúa aleatoriamente si no hay comida
+        # Actúa aleatoriamente si no hay comida
         return random.choice(actions)
 
     def collect_food(self, actions, food_list, game_state):
@@ -196,6 +203,40 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                 self.food_collected += 1  # Incrementa la comida recogida
 
         return best_action
+
+    def evade_enemy(self, actions, game_state, enemies):
+        """
+        Selecciona la acción que maximice la distancia con el enemigo más cercano.
+        """
+        my_pos = game_state.get_agent_position(self.index)
+        enemy_positions = [enemy.get_position() for enemy in enemies if enemy.get_position() is not None]
+
+        best_action = None
+        max_min_distance = -1
+
+        for action in actions:
+            successor = self.get_successor(game_state, action)
+            successor_pos = successor.get_agent_state(self.index).get_position()
+
+            # Calcular la distancia mínima con los enemigos para esta acción
+            min_distance_to_enemy = min(
+                self.get_maze_distance(successor_pos, enemy_pos) for enemy_pos in enemy_positions
+            )
+
+            # Maximizar la distancia mínima a cualquier enemigo
+            if min_distance_to_enemy > max_min_distance:
+                max_min_distance = min_distance_to_enemy
+                best_action = action
+
+        return best_action
+
+    def get_visible_enemies(self, game_state):
+        """
+        Retorna los enemigos visibles dentro del rango de observación.
+        """
+        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
+        visible_enemies = [enemy for enemy in enemies if enemy.get_position() is not None]
+        return visible_enemies
 
     def return_to_base(self, actions, game_state):
         """
@@ -239,7 +280,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             boundary_positions.append((boundary_x, y))
 
         return boundary_positions
-
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
