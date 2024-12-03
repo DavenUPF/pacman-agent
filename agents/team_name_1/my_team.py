@@ -246,13 +246,16 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         successor = self.get_successor(self.get_current_game_state(), action)
         return successor.get_agent_state(self.index).get_position()
 
-    def get_enemies_in_range(self):
+    def get_enemies_in_range(self, game_state, range_distance=5):
         """
-        Obtiene los enemigos dentro de un rango de 5 desde la posición del agente.
+        Obtiene los enemigos dentro de un rango de `range_distance` desde la posición del agente.
         """
-        enemies = [self.get_agent_state(i) for i in self.get_opponents(self.get_current_game_state())]
-        return [enemy for enemy in enemies if enemy.get_position() is not None and self.get_maze_distance(self.get_position(), enemy.get_position()) <= 5]
-
+        enemies = [game_state.get_agent_state(i) for i in self.get_opponents(game_state)]
+        enemies_in_range = [
+            enemy for enemy in enemies if enemy.get_position() is not None and 
+            self.get_maze_distance(game_state.get_agent_state(self.index).get_position(), enemy.get_position()) <= range_distance
+        ]
+        return enemies_in_range
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
     """
