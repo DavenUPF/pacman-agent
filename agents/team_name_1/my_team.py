@@ -170,7 +170,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             return random.choice(actions)
 
         # Si el agente se encuentra con un enemigo cerca, alejarse
-        enemies_in_range = self.get_enemies_in_range(game_state, 5)
+        enemies_in_range = self.get_enemies_in_range(game_state)
 
         # Si hay enemigos cerca, alejarse de ellos
         if enemies_in_range:
