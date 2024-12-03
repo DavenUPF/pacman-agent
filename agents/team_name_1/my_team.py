@@ -161,7 +161,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         La base está definida como la mitad izquierda del mapa.
         """
         current_pos = game_state.get_agent_state(self.index).get_position()
-        return current_pos[0] < self.base_x_limit  # El agente está en la mitad izquierda del mapa
+        return current_pos[0] <= self.base_x_limit  # El agente está en la mitad izquierda del mapa
 
     def get_features(self, game_state, action):
         """
