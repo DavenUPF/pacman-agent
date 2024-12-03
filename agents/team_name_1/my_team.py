@@ -155,7 +155,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         features['successor_score'] = -len(food_list)  # self.get_score(successor)
 
         # Compute distance to the nearest food
-        if len(food_list) > 0:  # This should always be True,  but better safe than sorry
+        if len(food_list) > 0:  # This should always be True, but better safe than sorry
             my_pos = successor.get_agent_state(self.index).get_position()
             min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
             features['distance_to_food'] = min_distance
@@ -184,9 +184,9 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         nearest_food = min(food_list, key=lambda food: self.get_maze_distance(my_pos, food))
 
         # Moverse hacia la comida más cercana
-        return self.move_towards_food(actions, nearest_food)
+        return self.move_towards_food(actions, nearest_food, game_state)
 
-    def move_towards_food(self, actions, food_pos):
+    def move_towards_food(self, actions, food_pos, game_state):
         """
         Mueve al agente hacia la comida más cercana.
         """
@@ -194,7 +194,8 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         min_distance = float('inf')
 
         for action in actions:
-            successor_pos = self.get_successor_position(action)
+            successor = self.get_successor(game_state, action)  # Obtener el siguiente estado del juego
+            successor_pos = successor.get_agent_state(self.index).get_position()  # Posición después de la acción
             dist = self.get_maze_distance(successor_pos, food_pos)
             if dist < min_distance:
                 min_distance = dist
@@ -221,7 +222,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             return best_action
 
         return random.choice(actions)  # Si no encuentra ninguna acción directa hacia la base, elige aleatoriamente
-
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
