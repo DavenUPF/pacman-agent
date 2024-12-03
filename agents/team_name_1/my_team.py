@@ -146,8 +146,13 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         """
         Inicializa el agente con las coordenadas de la base y el tamaño del mapa.
         """
-        self.map_width = len(game_state.getWalls()[0])  # Obtener el ancho del mapa
+        # Obtener el tamaño del mapa usando layout
+        self.map_width = game_state.data.layout.width  # Ancho del mapa
+        self.map_height = game_state.data.layout.height  # Altura del mapa
+        
+        # Establecer el límite de la base (mitad del mapa)
         self.base_x_limit = self.map_width // 2  # Definir el límite de la base (mitad izquierda del mapa)
+        
         super().register_initial_state(game_state)
 
     def is_at_base(self, game_state):
