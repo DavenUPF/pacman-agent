@@ -56,7 +56,7 @@ def create_team(first_index, second_index, is_red,
 ##########
 
 import heapq
-# Clase base que debería contener get_successor
+
 class ReflexCaptureAgent(CaptureAgent):
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
@@ -66,13 +66,6 @@ class ReflexCaptureAgent(CaptureAgent):
         self.start = game_state.get_agent_position(self.index)
         CaptureAgent.register_initial_state(self, game_state)
 
-    def get_successor(self, game_state, action):
-        """
-        Implementación del sucesor de la acción (tomado de la clase base CaptureAgent).
-        """
-        # Aquí estamos utilizando la implementación de la clase CaptureAgent
-        return game_state.generate_successor(self.index, action)
-    
     def a_star(self, game_state, start, goal):
         open_set = []
         heapq.heappush(open_set, (0, start))
@@ -108,13 +101,17 @@ class ReflexCaptureAgent(CaptureAgent):
         return path
 
     def get_neighbors(self, game_state, position):
-        x, y = position
+        """
+        Devuelve los vecinos accesibles desde una posición.
+        """
+        x, y = map(int, position)  # Convertir posición a enteros
         neighbors = []
-        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-            next_pos = (x + dx, y + dy)
-            if not game_state.has_wall(next_pos[0], next_pos[1]):
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  # Movimientos posibles
+            next_pos = (int(x + dx), int(y + dy))  # Asegurarse de que next_pos es una tupla de enteros
+            if not game_state.has_wall(next_pos[0], next_pos[1]):  # Comprobar si es válido
                 neighbors.append(next_pos)
         return neighbors
+
 
     def choose_action(self, game_state):
         actions = game_state.get_legal_actions(self.index)
@@ -139,7 +136,7 @@ class ReflexCaptureAgent(CaptureAgent):
 class OffensiveReflexAgent(ReflexCaptureAgent):
     def get_features(self, game_state, action):
         features = util.Counter()
-        successor = self.get_successor(game_state, action)  # Ahora se usa correctamente el método de la clase base
+        successor = self.get_successor(game_state, action)  # Usa el método get_successor de CaptureAgent
         food_list = self.get_food(successor).as_list()
 
         features['successor_score'] = -len(food_list)
